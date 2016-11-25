@@ -33,6 +33,12 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.nio.file.DirectoryStream;
+import java.nio.charset.Charset;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.fs.ByteBufferReadable;
@@ -86,6 +92,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
   private long blockEnd = -1;
   private CachingStrategy cachingStrategy;
   private final ReadStatistics readStatistics = new ReadStatistics();
+
+  private final boolean TRACK_STATS = false;
 
   public static class ReadStatistics {
     public ReadStatistics() {
@@ -731,8 +739,58 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
     }
   }
 
+  // private String printObj(Object obj)
+  // {
+  //     return obj.getClass().getName() + "@" + 
+  //         Integer.toHexString(System.identityHashCode(obj));
+  // }
+  //
+  // private void printThrd(String string)
+  // {
+  //     System.out.println(
+  //             "> TID = "
+  //             + Thread.currentThread().getId() + " :: " + string);
+  // }
+  //
+  // private void printTrace() {
+  //     System.out.println("---");
+  //     printThrd("DFSInputStream = " + printObj(this) + ", dfsClient.stats = " + printObj(dfsClient.stats));
+  //     for (StackTraceElement ste : Thread.currentThread().getStackTrace()) {
+  //         printThrd(ste.toString());
+  //     }
+  // }
+  //
+  // static String readFile(String path, Charset encoding) 
+  //     throws IOException 
+  // {
+  //     byte[] encoded = Files.readAllBytes(Paths.get(path));
+  //     return new String(encoded, encoding);
+  // }
+  //
+  // private String getpid() throws IOException {
+  //     // "/proc/self"
+  //
+  //     Path dir = Paths.get("/proc/self/task");
+  //     DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*");
+  //     // assert stream.length() == 1;
+  //     for (Path file : stream) {
+  //         return file.toString();
+  //     }
+  //     return null;
+  // }
+
   private int readWithStrategy(ReaderStrategy strategy, int off, int len) throws IOException {
     dfsClient.checkOpen();
+
+    // Lets trigger an exception.
+    // System.out.println("Exception time...");
+    // DFSClient nullPtr = null;
+    // nullPtr.getNamenode();
+
+    // throw new RuntimeException("The current process id is " + getpid() + 
+    //         ", comm = " + 
+    //         readFile("/proc/self/comm", Charset.defaultCharset()));
+
     if (closed) {
       throw new IOException("Stream closed");
     }
@@ -750,15 +808,16 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
           }
           int realLen = (int) Math.min(len, (blockEnd - pos + 1L));
           int result = readBuffer(strategy, off, realLen, corruptedBlockMap);
-          
+
           if (result >= 0) {
             pos += result;
           } else {
             // got a EOS from reader though we expect more data on it.
             throw new IOException("Unexpected EOS from the reader");
           }
-          if (dfsClient.stats != null && result != -1) {
+          if (TRACK_STATS && dfsClient.stats != null && result != -1) {
             dfsClient.stats.incrementBytesRead(result);
+            // printTrace();
           }
           return result;
         } catch (ChecksumException ce) {
@@ -781,6 +840,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
       }
     }
     return -1;
+
   }
 
   /**
@@ -1165,7 +1225,7 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
       offset += bytesToRead;
     }
     assert remaining == 0 : "Wrong number of bytes read.";
-    if (dfsClient.stats != null) {
+    if (TRACK_STATS && dfsClient.stats != null) {
       dfsClient.stats.incrementBytesRead(realLen);
     }
     return realLen;
