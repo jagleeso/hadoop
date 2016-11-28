@@ -93,7 +93,8 @@ implements ByteBufferReadable, CanSetDropBehind, CanSetReadahead {
   private CachingStrategy cachingStrategy;
   private final ReadStatistics readStatistics = new ReadStatistics();
 
-  private final boolean TRACK_STATS = false;
+  private final boolean TRACK_STATS = true;
+  // private final boolean TRACK_STATS = false;
 
   public static class ReadStatistics {
     public ReadStatistics() {
